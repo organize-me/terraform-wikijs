@@ -1,0 +1,6 @@
+# Intellij IDEA
+.idea
+
+**/.terraform
+**/*.tfstate
+**/*.tfstate.backup
