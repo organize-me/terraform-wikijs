@@ -56,3 +56,38 @@ variable "postgres_port" {
   type        = number
   default     = 5432
 }
+
+# Backup/Restore Variables
+variable "backup_docker_postgres_image" {
+  description = "The Docker image used to backup the PostgreSQL database"
+  type        = string
+}
+
+variable "backup_docker_aws_image" {
+  description = "The Docker image used to backup the PostgreSQL database to AWS S3"
+  type        = string
+}
+
+variable "backup_install_path" {
+  description = "The path to install the backup/restore scripts"
+  type        = string
+  default     = "../bin"
+}
+
+variable "backup_archive_name" {
+  description = "The name of the backup archive"
+  type        = string
+  default     = "wikijs-backup.tar.gz"
+}
+
+variable "backup_s3_bucket" {
+  description = "The S3 bucket to store the backup archive"
+  type        = string
+  default = "none"
+}
+
+variable "backup_tmp_dir" {
+  description = "The temporary directory to store the backup archive"
+  type        = string
+  default     = "../tmp"
+}

@@ -1,6 +1,6 @@
 # This resource pulls the PostgreSQL Docker image with the specified version.
 resource "docker_image" "postgres" {
-  name = "postgres:17"
+  name = var.backup_docker_postgres_image
 }
 
 # This resource creates a Docker container for PostgreSQL.
