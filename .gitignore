@@ -1,6 +1,11 @@
 # Intellij IDEA
 .idea
 
+# Terraform
 **/.terraform
 **/*.tfstate
 **/*.tfstate.backup
+
+# Temporary Folders
+bin
+tmp

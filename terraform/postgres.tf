@@ -7,7 +7,7 @@ provider "postgresql" {
 
 }
 
-# Create the SonarQube database
+# Create the database
 resource "postgresql_database" "wikijs" {
   name = var.wikijs_db_username
 }
@@ -26,4 +26,6 @@ resource "postgresql_grant" "wikijs" {
   schema      = "public"
   object_type = "schema"
   privileges  = ["CREATE", "USAGE"]
+
+  depends_on = [postgresql_database.wikijs, postgresql_role.wikijs]
 }

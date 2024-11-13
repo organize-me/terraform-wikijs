@@ -74,6 +74,12 @@ variable "backup_install_path" {
   default     = "../bin"
 }
 
+variable "backup_script_name" {
+  description = "The name of the backup script"
+  type        = string
+  default     = "backup.sql"
+}
+
 variable "backup_archive_name" {
   description = "The name of the backup archive"
   type        = string

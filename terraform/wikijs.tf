@@ -26,5 +26,10 @@ resource "docker_container" "wikijs" {
     internal = 3000
     external = 3000
   }
-  depends_on = [postgresql_grant.wikijs]
+
+  depends_on = [
+    postgresql_database.wikijs,
+    postgresql_role.wikijs,
+    postgresql_grant.wikijs
+  ]
 }
