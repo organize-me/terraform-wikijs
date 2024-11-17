@@ -1,0 +1,126 @@
+#!/bin/sh
+
+export TEMP_DIR_HOST="${TF_BACKUP_TMP_DIR}"
+
+# Clean up
+cleanup () {
+  echo "Cleanup Start"
+
+  # Delete the temporary directory
+  if [ -d "$TEMP_DIR_HOST" ]; then
+    rm -rf "$TEMP_DIR_HOST"
+  fi
+
+  echo "Restarting wikijs container"
+  docker restart ${TF_WIKIJS_CONTAINER_NAME} || exit 1
+
+  echo "Cleanup Complete"
+}
+
+# Halt the script
+halt () {
+  # $1 - Exit code (optional)
+  # $2 - Message (optional)
+
+  if [ -n "$1" ]; then
+    EXIT_CODE=$1
+  else
+    EXIT_CODE=0
+  fi
+
+  cleanup
+
+  # Exit
+  if [ "$EXIT_CODE" -ne 0 ]; then
+    if [ -n "$2" ]; then
+      echo "Restore Failed: $2"
+    else
+      echo "Restore Failed"
+    fi
+  fi
+  exit "$EXIT_CODE"
+}
+
+download() {
+  echo "Download Start"
+
+  # Create temporary directory
+  mkdir -p "$TEMP_DIR_HOST" || halt 1 "Failed to create temporary directory"
+
+  TEMP_DIR_AWSCLI="/tmp/restore"
+
+  set -- "--rm"
+  set -- "$@" "--name" "wikijs_restore"
+  set -- "$@" "--volume" "$TEMP_DIR_HOST:$TEMP_DIR_AWSCLI"
+
+  # AWS Directory (if exists)
+  if [ -d "$HOME/.aws" ]; then
+    set -- "$@" "--volume" "$HOME/.aws:/root/.aws:ro"
+  fi
+
+  # AWS DEFAULT REGION (if exists)
+  if [ -n "$AWS_DEFAULT_REGION" ]; then
+    set -- "$@" "--env" "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
+  fi
+
+  if [ -n "$AWS_S3_ENDPOINT_URL" ]; then
+    set -- "$@" "--env" "AWS_S3_ENDPOINT_URL=$AWS_S3_ENDPOINT_URL"
+  fi
+
+  # AWS ACCESS KEY ID (if exists)
+  if [ -n "$AWS_ACCESS_KEY_ID" ]; then
+    set -- "$@" "--env" "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+  fi
+
+  # AWS SECRET ACCESS KEY (if exists)
+  if [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+    set -- "$@" "--env" "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+  fi
+
+  CMD="s3"
+  [ -n "$AWS_S3_ENDPOINT_URL" ] && CMD="s3 --endpoint-url $AWS_S3_ENDPOINT_URL"
+  CMD="$CMD cp s3://${TF_S3_BACKUP_BUCKET}/${TF_ARCHIVE_NAME} $TEMP_DIR_AWSCLI/${TF_ARCHIVE_NAME}"
+
+  docker run "$@" "${TF_AWS_CLI_IMAGE}" $CMD || halt 1 "Unable to download backup archive from S3"
+
+  echo "Download Complete"
+}
+
+restore() {
+  echo "Restore Start"
+
+  TEMP_DIR_DATA="$TEMP_DIR_HOST/data"
+  mkdir -p "$TEMP_DIR_DATA" || halt 1 "Failed to create data directory"
+
+  # Restore the backup
+  tar -xzf "$TEMP_DIR_HOST/${TF_ARCHIVE_NAME}" -C "$TEMP_DIR_DATA" || halt 1 "Failed to decompress backup archive"
+
+  docker run --rm \
+    --name "wikijs_restore" \
+    --network "${TF_DOCKER_NETWORK}" \
+    --volume "$TEMP_DIR_DATA:/root:ro" \
+    --entrypoint "psql" \
+    --env "PGPASSWORD=${TF_POSTGRES_PASSWORD}" \
+    "${TF_POSTGRES_IMAGE}" \
+    -U "${TF_POSTGRES_USER}" -h "${TF_POSTGRES_HOST}" -p "${TF_POSTGRES_PORT}" -d "${TF_POSTGRES_DB}" -f "/root/${TF_SCRIPT_NAME}" || halt 1 "Failed to restore backup"
+
+  echo "Restore Complete"
+}
+
+run() {
+  echo "Stop wikijs container"
+  docker stop ${TF_WIKIJS_CONTAINER_NAME} || halt 1 "Failed to stop wikijs container"
+
+  download
+  restore
+  cleanup
+}
+
+# Capture start time
+START_TIME=$(date +%s)
+
+# Ensure elapsed time is displayed on exit
+trap 'ELAPSED_TIME=$(($(date +%s) - $START_TIME)); echo "Execution time: $ELAPSED_TIME seconds"' EXIT
+
+# Run the restore process
+run
