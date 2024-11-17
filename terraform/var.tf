@@ -15,7 +15,7 @@ variable "docker_network" {
 # WikiJS Variables
 variable "wikijs_image" {
   type = string
-  default = "requarks/wiki:2.5.300"
+  default = "requarks/wiki:2.5"
 }
 variable "wikijs_db_host" {
   description = "The host used to connect to PostgreSQL from the wikijs container"
